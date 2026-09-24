@@ -12,6 +12,7 @@ dist/
 browsers/
 
 # Runtime data (may contain credentials and captured traffic)
+.env
 output/
 auth/
 

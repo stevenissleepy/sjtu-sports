@@ -1,12 +1,15 @@
 import argparse
 import json
+import os
 import time
 from datetime import datetime
 
 import requests
+from dotenv import load_dotenv
 
-from sjtu_sports.utils.paths import AUTH_DIR
 from sjtu_sports.utils import crypto
+from sjtu_sports.utils.paths import AUTH_DIR, HOME
+from sjtu_sports.utils.wechat import send_serverchan
 
 BASE = "https://sports.sjtu.edu.cn"
 STATE_FILE = AUTH_DIR / "storage_state.json"
@@ -262,7 +265,7 @@ def grab(s, args, motion_type, date_id):
                     print("提交结果未知，请先查询订单状态，不要立即重复提交。")
                     return
                 if r.get("code") == 0:
-                    return
+                    return field["fieldName"], PERIODS[idx]
                 if r.get("code") == 1002:
                     print("触发滑块验证码 (code 1002)，纯 HTTP 脚本暂无法自动处理，请改用浏览器手动提交。")
                     return
@@ -332,12 +335,16 @@ def main():
 
     if args.time and args.time not in PERIODS:
         ap.error(f"--time 必须是有效整点时段，例如 {PERIODS[0]}")
+    if args.long_run:
+        load_dotenv(HOME / ".env", override=False)
+    notify_key = os.environ.get("SERVERCHAN_SENDKEY", "").strip()
 
     s = make_session()
     venue = resolve_venue(s, args.venue)
     if not venue:
         print(f"未找到场馆「{args.venue}」，可用 list-venues 查看")
         return
+    args.venue_name = venue["venueName"]
     args.venue = venue["venueId"]
 
     resp = query_venue_types(s, args.venue)
@@ -365,7 +372,21 @@ def main():
         return
     date_id = date_entry["dateId"]
 
-    grab(s, args, motion_type, date_id)
+    reserved = grab(s, args, motion_type, date_id)
+    if args.long_run and notify_key and reserved:
+        field_name, period = reserved
+        description = (
+            f"场馆：{args.venue_name}\n"
+            f"项目：{motion_type['name']}\n"
+            f"日期：{args.date}\n"
+            f"时段：{period}\n"
+            f"场地：{field_name}"
+        )
+        sent, error = send_serverchan(notify_key, "场地抢订成功", description)
+        if sent:
+            print("微信通知已发送。")
+        else:
+            print(f"预约已提交，但微信通知发送失败：{error}")
 
 
 if __name__ == "__main__":

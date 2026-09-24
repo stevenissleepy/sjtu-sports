@@ -49,9 +49,30 @@ python -m sjtu_sports reserve \
 - `--date`   目标日期 `YYYY-MM-DD`
 - `--time`   目标时段，如 `13:00-14:00`（不填则抢任意可用时段）
 - `--field`  指定场地名，如 `场地1`
-- `--long-run` 长轮询模式，每 0.7 秒查询一次；默认每 0.3 秒查询一次
+- `--long-run` 长轮询模式，每 0.7 秒查询一次；默认模式每 0.3 秒查询一次
 
-## 抓包分析（analyze）
+## 微信通知 (Optional)
+
+长轮询模式支持可选的微信通知。配置 SendKey 后，成功提交预约时会通过 Server酱 Turbo 向微信发送一条通知；未配置时长轮询照常运行，不发送通知。
+
+先按[Server酱官方说明](https://sct.ftqq.com/docs/getting-started/sendkey/)用微信登录、配置接收通道并获取以 `SCT` 开头的 SendKey。然后在仓库根目录下创建 `.env` 文件，在里面写上：
+
+```dotenv
+SERVERCHAN_SENDKEY="你的SendKey"
+```
+
+然后在仓库根目录下执行：
+
+```sh
+python -m sjtu_sports reserve \
+  --venue 霍英东体育中心 \
+  --sport 羽毛球 \
+  --date 2026-09-26 \
+  --time 13:00-14:00 \
+  --long-run
+```
+
+## 抓包分析
 
 使用包级命令启动以下两个功能：
 
