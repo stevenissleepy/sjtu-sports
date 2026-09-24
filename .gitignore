@@ -11,9 +11,9 @@ dist/
 .venv/
 browsers/
 
-# Runtime data (may contain credentials and captured traffic)
+# Runtime data
 .env
-botpy.log
+*.log
 output/
 auth/
 

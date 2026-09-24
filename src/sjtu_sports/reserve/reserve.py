@@ -38,8 +38,8 @@ UNAVAILABLE = {"-1", "-2", "-3"}
 
 TENSION = {0: "正常", 1: "紧张", 2: "很紧张", 3: "非常紧张", 4: "很紧张(签退)"}
 
-POLL_INTERVAL = 0.3
-LONG_RUN_POLL_INTERVAL = 0.8
+POLL_INTERVAL = 0.8
+LONG_RUN_POLL_INTERVAL = 60.0
 QUERY_TIMEOUT = (2.0, 10.0)
 SUBMIT_TIMEOUT = 8.0
 
@@ -378,7 +378,7 @@ def main():
     ap.add_argument(
         "--long-run",
         action="store_true",
-        help="长期轮询，每 0.8 秒查询一次；默认每 0.3 秒",
+        help="长期轮询，每 1 分钟查询一次；默认每 0.8 秒",
     )
     args = ap.parse_args()
 
