@@ -7,7 +7,7 @@ def main():
     if len(sys.argv) < 2 or sys.argv[1] in {"-h", "--help"}:
         print(
             "用法: python -m sjtu_sports "
-            "<login|list-venues|list-sports|reserve|capture|analyze> [参数]"
+            "<login|list-venues|list-sports|reserve|qq-openid|capture|analyze> [参数]"
         )
         return
 
@@ -22,6 +22,8 @@ def main():
         from sjtu_sports.reserve.reserve import list_sports_main as command_main
     elif command == "reserve":
         from sjtu_sports.reserve.reserve import main as command_main
+    elif command == "qq-openid":
+        from sjtu_sports.utils.qq import qq_openid_main as command_main
     elif command == "capture":
         from sjtu_sports.analyze.capture import main as command_main
     elif command == "analyze":

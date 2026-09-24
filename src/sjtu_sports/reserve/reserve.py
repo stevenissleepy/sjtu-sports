@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 from sjtu_sports.utils import crypto
 from sjtu_sports.utils.paths import AUTH_DIR, HOME
-from sjtu_sports.utils.wechat import send_serverchan
+from sjtu_sports.utils.qq import send_qq_bot
 
 BASE = "https://sports.sjtu.edu.cn"
 STATE_FILE = AUTH_DIR / "storage_state.json"
@@ -386,7 +386,9 @@ def main():
         ap.error(f"--time 必须是有效整点时段，例如 {PERIODS[0]}")
     if args.long_run:
         load_dotenv(HOME / ".env", override=False)
-    notify_key = os.environ.get("SERVERCHAN_SENDKEY", "").strip()
+    qq_app_id = os.environ.get("QQ_BOT_APP_ID", "").strip()
+    qq_app_secret = os.environ.get("QQ_BOT_APP_SECRET", "").strip()
+    qq_user_openid = os.environ.get("QQ_BOT_USER_OPENID", "").strip()
 
     s = make_session()
     venue = resolve_venue(s, args.venue)
@@ -429,7 +431,7 @@ def main():
     date_id = date_entry["dateId"]
 
     reserved = grab(s, args, motion_type, date_id)
-    if args.long_run and notify_key and reserved:
+    if args.long_run and qq_app_id and qq_app_secret and qq_user_openid and reserved:
         field_name, period = reserved
         description = (
             f"场馆：{args.venue_name}\n"
@@ -438,11 +440,13 @@ def main():
             f"时段：{period}\n"
             f"场地：{field_name}"
         )
-        sent, error = send_serverchan(notify_key, "场地抢订成功", description)
+        sent, error = send_qq_bot(
+            qq_app_id, qq_app_secret, qq_user_openid, f"场地抢订成功\n{description}"
+        )
         if sent:
-            print("微信通知已发送。")
+            print("QQ 通知已发送。")
         else:
-            print(f"预约已提交，但微信通知发送失败：{error}")
+            print(f"预约已提交，但 QQ 通知发送失败：{error}")
 
 
 if __name__ == "__main__":

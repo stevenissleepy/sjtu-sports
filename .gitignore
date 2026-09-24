@@ -13,6 +13,7 @@ browsers/
 
 # Runtime data (may contain credentials and captured traffic)
 .env
+botpy.log
 output/
 auth/
 

@@ -51,14 +51,24 @@ python -m sjtu_sports reserve \
 - `--field`  指定场地名，如 `场地1`
 - `--long-run` 长轮询模式，每 0.8 秒查询一次；默认模式每 0.3 秒查询一次
 
-## 微信通知 (Optional)
+## QQ 通知（可选）
 
-长轮询模式支持可选的微信通知。配置 SendKey 后，成功提交预约时会通过 Server酱 Turbo 向微信发送一条通知；未配置时长轮询照常运行，不发送通知。
+长轮询模式支持可选的 QQ 私聊通知。配置 QQ 官方机器人后，成功提交预约时会通过机器人发送一条消息。
 
-先按[Server酱官方说明](https://sct.ftqq.com/docs/getting-started/sendkey/)用微信登录、配置接收通道并获取以 `SCT` 开头的 SendKey。然后在仓库根目录下创建 `.env` 文件，在里面写上：
+在 [QQ 机器人开放平台](https://q.qq.com/)用自己的 QQ 创建个人机器人，保存 AppID 和 AppSecret。机器人会自动出现在创建者的 QQ 消息列表中。
+
+启动下面这个脚本，给机器人发一条消息，脚本会输出接受者的 user_openid 然后结束
+
+```sh
+python -m sjtu_sports qq-openid
+```
+
+在仓库根目录下创建 `.env` 文件然后填入
 
 ```dotenv
-SERVERCHAN_SENDKEY="你的SendKey"
+QQ_BOT_APP_ID="机器人的AppID"
+QQ_BOT_APP_SECRET="机器人的AppSecret"
+QQ_BOT_USER_OPENID="接受者的user_openid"
 ```
 
 然后在仓库根目录下执行：
