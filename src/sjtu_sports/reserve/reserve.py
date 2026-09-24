@@ -15,9 +15,21 @@ BASE = "https://sports.sjtu.edu.cn"
 STATE_FILE = AUTH_DIR / "storage_state.json"
 
 PERIODS = [
-    "07:00-08:00", "08:00-09:00", "09:00-10:00", "10:00-11:00", "11:00-12:00",
-    "12:00-13:00", "13:00-14:00", "14:00-15:00", "15:00-16:00", "16:00-17:00",
-    "17:00-18:00", "18:00-19:00", "19:00-20:00", "20:00-21:00", "21:00-22:00",
+    "07:00-08:00",
+    "08:00-09:00",
+    "09:00-10:00",
+    "10:00-11:00",
+    "11:00-12:00",
+    "12:00-13:00",
+    "13:00-14:00",
+    "14:00-15:00",
+    "15:00-16:00",
+    "16:00-17:00",
+    "17:00-18:00",
+    "18:00-19:00",
+    "19:00-20:00",
+    "20:00-21:00",
+    "21:00-22:00",
 ]
 
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
@@ -27,7 +39,7 @@ UNAVAILABLE = {"-1", "-2", "-3"}
 TENSION = {0: "正常", 1: "紧张", 2: "很紧张", 3: "非常紧张", 4: "很紧张(签退)"}
 
 POLL_INTERVAL = 0.3
-LONG_RUN_POLL_INTERVAL = 0.7
+LONG_RUN_POLL_INTERVAL = 0.8
 QUERY_TIMEOUT = (2.0, 10.0)
 SUBMIT_TIMEOUT = 8.0
 
@@ -50,13 +62,17 @@ def make_session():
     s = requests.Session()
     state = json.loads(STATE_FILE.read_text(encoding="utf-8"))
     for c in state["cookies"]:
-        s.cookies.set(c["name"], c["value"], domain=c["domain"], path=c.get("path", "/"))
-    s.headers.update({
-        "User-Agent": UA,
-        "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "zh-CN,zh;q=0.9",
-        "Referer": "https://sports.sjtu.edu.cn/pc/",
-    })
+        s.cookies.set(
+            c["name"], c["value"], domain=c["domain"], path=c.get("path", "/")
+        )
+    s.headers.update(
+        {
+            "User-Agent": UA,
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "zh-CN,zh;q=0.9",
+            "Referer": "https://sports.sjtu.edu.cn/pc/",
+        }
+    )
     return s
 
 
@@ -84,8 +100,11 @@ def json_post(s, path, data, extra_headers=None, timeout=5.0):
 
 
 def form_post(s, path, data):
-    r = s.post(BASE + path, data=data,
-               headers={"Content-Type": "application/x-www-form-urlencoded"})
+    r = s.post(
+        BASE + path,
+        data=data,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
     r.encoding = "utf-8"
     try:
         return r.json()
@@ -98,12 +117,16 @@ def query_venue_types(s, venue_id):
 
 
 def query_venues(s):
-    return form_post(s, "/manage/venue/list", {
-        "venueName": "",
-        "pageNum": 1,
-        "pageSize": 100,
-        "flag": 1,
-    })
+    return form_post(
+        s,
+        "/manage/venue/list",
+        {
+            "venueName": "",
+            "pageNum": 1,
+            "pageSize": 100,
+            "flag": 1,
+        },
+    )
 
 
 def resolve_venue(s, selector):
@@ -112,7 +135,8 @@ def resolve_venue(s, selector):
     venues = response.get("rows") or []
     selector_folded = selector.casefold()
     matches = [
-        venue for venue in venues
+        venue
+        for venue in venues
         if selector == venue.get("venueId")
         or selector == venue.get("venueName")
         or selector_folded == (venue.get("venueNameEn") or "").casefold()
@@ -126,9 +150,15 @@ def query_date_id(s, venue_id, field_type_id, date_str):
 
 
 def query_fields(s, venue_id, field_type_id, date_str, date_id, timeout=5.0):
-    data = {"fieldType": field_type_id, "date": date_str,
-            "venueId": venue_id, "dateId": date_id}
-    return json_post(s, "/manage/fieldDetail/queryFieldSituation", data, timeout=timeout)
+    data = {
+        "fieldType": field_type_id,
+        "date": date_str,
+        "venueId": venue_id,
+        "dateId": date_id,
+    }
+    return json_post(
+        s, "/manage/fieldDetail/queryFieldSituation", data, timeout=timeout
+    )
 
 
 def confirm_order(s, body, tid=None, date_id=None, timeout=8.0, key=None, sid=None):
@@ -176,14 +206,16 @@ def is_venue_conflict(response):
 
 def build_space(item, field, row_idx):
     space = {("venuePrice" if k == "price" else k): v for k, v in item.items()}
-    space.update({
-        "scheduleTime": PERIODS[row_idx],
-        "subSitename": field["fieldName"],
-        "subSiteId": field["fieldId"],
-        "tensity": field["fieldDetailStatus"],
-        "venueNum": 1,
-        "status": 1,
-    })
+    space.update(
+        {
+            "scheduleTime": PERIODS[row_idx],
+            "subSitename": field["fieldName"],
+            "subSiteId": field["fieldId"],
+            "tensity": field["fieldDetailStatus"],
+            "venueNum": 1,
+            "status": 1,
+        }
+    )
     return space
 
 
@@ -248,7 +280,9 @@ def grab(s, args, motion_type, date_id):
                 status = str(item.get("status"))
                 if status in UNAVAILABLE:
                     continue
-                print(f"命中可用: {field['fieldName']} {PERIODS[idx]} (status={status}, price={item.get('price')})")
+                print(
+                    f"命中可用: {field['fieldName']} {PERIODS[idx]} (status={status}, price={item.get('price')})"
+                )
 
                 space = build_space(item, field, idx)
                 body = dict(base_body, spaces=[space])
@@ -267,7 +301,9 @@ def grab(s, args, motion_type, date_id):
                 if r.get("code") == 0:
                     return field["fieldName"], PERIODS[idx]
                 if r.get("code") == 1002:
-                    print("触发滑块验证码 (code 1002)，纯 HTTP 脚本暂无法自动处理，请改用浏览器手动提交。")
+                    print(
+                        "触发滑块验证码 (code 1002)，纯 HTTP 脚本暂无法自动处理，请改用浏览器手动提交。"
+                    )
                     return
                 if is_venue_conflict(r):
                     conflict_count += 1
@@ -286,14 +322,19 @@ def list_venues_main():
     response = query_venues(make_session())
     venues = response.get("rows") or []
     if not venues:
-        print("获取场馆列表失败:", response.get("msg") or response.get("msgContent") or response)
+        print(
+            "获取场馆列表失败:",
+            response.get("msg") or response.get("msgContent") or response,
+        )
         return
 
     print("场馆:")
     for venue in venues:
         english_name = venue.get("venueNameEn") or ""
         campus = venue.get("campusName") or venue.get("campusNameEn") or ""
-        print(f"  - {venue['venueName']} ({english_name}) id={venue['venueId']} 校区={campus}")
+        print(
+            f"  - {venue['venueName']} ({english_name}) id={venue['venueId']} 校区={campus}"
+        )
 
 
 def list_sports_main():
@@ -326,11 +367,19 @@ def list_sports_main():
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--venue", required=True, help="场馆名称，可用 list-venues 查看")
-    ap.add_argument("--sport", required=True, help="运动类型名称或 id，可用 list-sports 查看")
+    ap.add_argument(
+        "--sport", required=True, help="运动类型名称或 id，可用 list-sports 查看"
+    )
     ap.add_argument("--date", default=None, help="目标日期 YYYY-MM-DD")
-    ap.add_argument("--time", default=None, help="目标时段如 13:00-14:00，不填则抢任意可用")
+    ap.add_argument(
+        "--time", default=None, help="目标时段如 13:00-14:00，不填则抢任意可用"
+    )
     ap.add_argument("--field", default=None, help="优先场地名，如 场地1")
-    ap.add_argument("--long-run", action="store_true", help="长期轮询，每 0.7 秒查询一次；默认每 0.3 秒")
+    ap.add_argument(
+        "--long-run",
+        action="store_true",
+        help="长期轮询，每 0.8 秒查询一次；默认每 0.3 秒",
+    )
     args = ap.parse_args()
 
     if args.time and args.time not in PERIODS:
@@ -349,7 +398,10 @@ def main():
 
     resp = query_venue_types(s, args.venue)
     if resp.get("code") != 0:
-        print("获取场馆信息失败，可能 cookie 已过期，请重新运行 save_login.py:", resp.get("msg"))
+        print(
+            "获取场馆信息失败，可能 cookie 已过期，请重新运行 save_login.py:",
+            resp.get("msg"),
+        )
         return
     motion_types = resp["data"].get("motionTypes") or []
 
@@ -362,13 +414,17 @@ def main():
         print("请提供 --date")
         return
 
-    r = query_date_id(s, args.venue, motion_type["id"], datetime.now().strftime("%Y-%m-%d"))
+    r = query_date_id(
+        s, args.venue, motion_type["id"], datetime.now().strftime("%Y-%m-%d")
+    )
     if r.get("code") != 0 or not r.get("data"):
         print("查询日期失败:", r.get("msg"))
         return
     date_entry = next((d for d in r["data"] if d.get("date") == args.date), None)
     if not date_entry:
-        print(f"目标日期 {args.date} 不在可预订范围: {', '.join(d['date'] for d in r['data'])}")
+        print(
+            f"目标日期 {args.date} 不在可预订范围: {', '.join(d['date'] for d in r['data'])}"
+        )
         return
     date_id = date_entry["dateId"]
 
