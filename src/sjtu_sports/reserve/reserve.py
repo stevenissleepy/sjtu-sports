@@ -24,6 +24,7 @@ UNAVAILABLE = {"-1", "-2", "-3"}
 TENSION = {0: "正常", 1: "紧张", 2: "很紧张", 3: "非常紧张", 4: "很紧张(签退)"}
 
 POLL_INTERVAL = 0.3
+LONG_RUN_POLL_INTERVAL = 0.7
 QUERY_TIMEOUT = (2.0, 10.0)
 SUBMIT_TIMEOUT = 8.0
 
@@ -185,6 +186,7 @@ def build_space(item, field, row_idx):
 
 def grab(s, args, motion_type, date_id):
     target_period = PERIODS.index(args.time) if args.time else None
+    poll_interval = LONG_RUN_POLL_INTERVAL if args.long_run else POLL_INTERVAL
     base_body = {
         "venTypeId": motion_type["id"],
         "venueId": args.venue,
@@ -204,7 +206,7 @@ def grab(s, args, motion_type, date_id):
         if delay > 0:
             time.sleep(delay)
         request_started = time.monotonic()
-        next_poll = request_started + POLL_INTERVAL
+        next_poll = request_started + poll_interval
 
         resp = query_fields(
             s,
@@ -217,9 +219,6 @@ def grab(s, args, motion_type, date_id):
         if resp.get("code") != 0:
             failures += 1
             message = resp.get("msg") or resp.get("raw") or "未知错误"
-            if not args.wait:
-                print("查询场地失败:", message)
-                return
             if failures == 1 or failures % 10 == 0:
                 print(f"查询暂时失败，继续等待（连续 {failures} 次）: {message}")
             continue
@@ -250,10 +249,6 @@ def grab(s, args, motion_type, date_id):
 
                 space = build_space(item, field, idx)
                 body = dict(base_body, spaces=[space])
-                if args.dry_run:
-                    print("DRY-RUN 请求体:")
-                    print(json.dumps(body, ensure_ascii=False, indent=1))
-                    return
                 print("提交抢订...")
                 r = confirm_order(
                     s,
@@ -281,15 +276,7 @@ def grab(s, args, motion_type, date_id):
                 return
 
         if conflict_count:
-            if args.wait:
-                print(f"本轮 {conflict_count} 个可用场地均竞争失败，重新查询...")
-                continue
-            print(f"本轮 {conflict_count} 个可用场地均已被其他用户占用。")
-            return
-
-        if not args.wait:
-            print("目标时段暂无可用场地。")
-            return
+            print(f"本轮 {conflict_count} 个可用场地均竞争失败，重新查询...")
 
 
 def list_venues_main():
@@ -340,8 +327,7 @@ def main():
     ap.add_argument("--date", default=None, help="目标日期 YYYY-MM-DD")
     ap.add_argument("--time", default=None, help="目标时段如 13:00-14:00，不填则抢任意可用")
     ap.add_argument("--field", default=None, help="优先场地名，如 场地1")
-    ap.add_argument("--dry-run", action="store_true", help="只查询并构造请求体，不真正提交")
-    ap.add_argument("--wait", action="store_true", help="轮询等待目标时段变为可用")
+    ap.add_argument("--long-run", action="store_true", help="长期轮询，每 0.7 秒查询一次；默认每 0.3 秒")
     args = ap.parse_args()
 
     if args.time and args.time not in PERIODS:

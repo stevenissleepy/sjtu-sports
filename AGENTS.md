@@ -23,6 +23,6 @@
 - `python -m sjtu_sports login`：打开浏览器并更新登录状态。
 - `python -m sjtu_sports list-venues`：列出全部场馆名称和 id。
 - `python -m sjtu_sports list-sports --venue 霍英东体育中心`：列出指定场馆的运动类型。
-- `python -m sjtu_sports reserve --venue 霍英东体育中心 --sport 羽毛球 --date 2026-09-26 --time 13:00-14:00 --dry-run`：构造预约请求但不提交。
+- `python -m sjtu_sports reserve --help`：查看预约参数；实际预约默认每 0.3 秒查询一次，`--long-run` 每 0.7 秒查询一次。
 - `python -m sjtu_sports capture`：捕获 XHR 和 Fetch 请求。
 - `python -m sjtu_sports analyze`：分析 `output/captured.json`。

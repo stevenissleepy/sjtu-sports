@@ -26,21 +26,20 @@ python -m sjtu_sports list-venues
 # 查看指定场馆的运动类型
 python -m sjtu_sports list-sports --venue 霍英东体育中心
 
-# 试跑：只查询并构造请求体，不真正提交
+# 短轮询，用于高峰期抢场地
 python -m sjtu_sports reserve \
   --venue 霍英东体育中心 \
   --sport 羽毛球 \
   --date 2026-09-26 \
-  --time 13:00-14:00 \ 
-  --dry-run
+  --time 13:00-14:00
 
-# 真正抢：--wait 会一直轮询，目标时段一变可用就立即提交
+# 长轮询，用于长期运行捡漏空场
 python -m sjtu_sports reserve \
   --venue 霍英东体育中心 \
   --sport 羽毛球 \
   --date 2026-09-26 \
   --time 13:00-14:00 \
-  --wait
+  --long-run
 ```
 
 参数：
@@ -50,8 +49,7 @@ python -m sjtu_sports reserve \
 - `--date`   目标日期 `YYYY-MM-DD`
 - `--time`   目标时段，如 `13:00-14:00`（不填则抢任意可用时段）
 - `--field`  指定场地名，如 `场地1`
-- `--wait`   轮询等待目标时段可用
-- `--dry-run` 只构造请求体，不提交
+- `--long-run` 长轮询模式，每 0.7 秒查询一次；默认每 0.3 秒查询一次
 
 ## 抓包分析（analyze）
 
