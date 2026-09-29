@@ -7,12 +7,11 @@ from datetime import datetime
 import requests
 from dotenv import load_dotenv
 
+from sjtu_sports.reserve.listing import TENSION, query_venue_types, resolve_venue
 from sjtu_sports.utils import crypto
-from sjtu_sports.utils.paths import AUTH_DIR, HOME
+from sjtu_sports.utils.auth import SPORTS_BASE, ensure_authenticated, make_session, retry_read_after_login
+from sjtu_sports.utils.paths import HOME
 from sjtu_sports.utils.qq import send_qq_bot
-
-BASE = "https://sports.sjtu.edu.cn"
-STATE_FILE = AUTH_DIR / "storage_state.json"
 
 PERIODS = [
     "07:00-08:00",
@@ -32,11 +31,7 @@ PERIODS = [
     "21:00-22:00",
 ]
 
-UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36"
-
 UNAVAILABLE = {"-1", "-2", "-3"}
-
-TENSION = {0: "正常", 1: "紧张", 2: "很紧张", 3: "非常紧张", 4: "很紧张(签退)"}
 
 POLL_INTERVAL = 0.8
 LONG_RUN_POLL_INTERVAL = 60.0
@@ -58,31 +53,13 @@ VENUE_CONFLICT_MARKERS = (
 )
 
 
-def make_session():
-    s = requests.Session()
-    state = json.loads(STATE_FILE.read_text(encoding="utf-8"))
-    for c in state["cookies"]:
-        s.cookies.set(
-            c["name"], c["value"], domain=c["domain"], path=c.get("path", "/")
-        )
-    s.headers.update(
-        {
-            "User-Agent": UA,
-            "Accept": "application/json, text/plain, */*",
-            "Accept-Language": "zh-CN,zh;q=0.9",
-            "Referer": "https://sports.sjtu.edu.cn/pc/",
-        }
-    )
-    return s
-
-
 def json_post(s, path, data, extra_headers=None, timeout=5.0):
     headers = {"Content-Type": "application/json;charset=UTF-8"}
     if extra_headers:
         headers.update(extra_headers)
     try:
         r = s.post(
-            BASE + path,
+            SPORTS_BASE + path,
             data=data if isinstance(data, str) else None,
             json=None if isinstance(data, str) else data,
             headers=headers,
@@ -99,54 +76,11 @@ def json_post(s, path, data, extra_headers=None, timeout=5.0):
     return result
 
 
-def form_post(s, path, data):
-    r = s.post(
-        BASE + path,
-        data=data,
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-    )
-    r.encoding = "utf-8"
-    try:
-        return r.json()
-    except Exception:
-        return {"code": -1, "raw": r.text}
-
-
-def query_venue_types(s, venue_id):
-    return form_post(s, "/manage/venue/queryVenueById", {"id": venue_id})
-
-
-def query_venues(s):
-    return form_post(
-        s,
-        "/manage/venue/list",
-        {
-            "venueName": "",
-            "pageNum": 1,
-            "pageSize": 100,
-            "flag": 1,
-        },
-    )
-
-
-def resolve_venue(s, selector):
-    """Resolve a venue name or id to the venue returned by the API."""
-    response = query_venues(s)
-    venues = response.get("rows") or []
-    selector_folded = selector.casefold()
-    matches = [
-        venue
-        for venue in venues
-        if selector == venue.get("venueId")
-        or selector == venue.get("venueName")
-        or selector_folded == (venue.get("venueNameEn") or "").casefold()
-    ]
-    return matches[0] if len(matches) == 1 else None
-
-
 def query_date_id(s, venue_id, field_type_id, date_str):
     data = {"id": venue_id, "feildType": field_type_id, "date": date_str}
-    return json_post(s, "/manage/fieldDetail/queryFieldReserveSituationIsFull", data)
+    return retry_read_after_login(
+        s, lambda: json_post(s, "/manage/fieldDetail/queryFieldReserveSituationIsFull", data)
+    )
 
 
 def query_fields(s, venue_id, field_type_id, date_str, date_id, timeout=5.0):
@@ -243,6 +177,17 @@ def grab(s, args, motion_type, date_id):
         request_started = time.monotonic()
         next_poll = request_started + poll_interval
 
+        if date_id is None:
+            date_response = query_date_id(
+                s, args.venue, motion_type["id"], datetime.now().strftime("%Y-%m-%d")
+            )
+            dates = date_response.get("data") or []
+            date_entry = next((d for d in dates if d.get("date") == args.date), None)
+            if not date_entry:
+                print("登录态更新后暂时无法重新获取预约日期，继续等待。")
+                continue
+            date_id = date_entry["dateId"]
+
         resp = query_fields(
             s,
             args.venue,
@@ -252,6 +197,14 @@ def grab(s, args, motion_type, date_id):
             timeout=QUERY_TIMEOUT,
         )
         if resp.get("code") != 0:
+            if not resp.get("network_error"):
+                try:
+                    if ensure_authenticated(s):
+                        date_id = None
+                        failures = 0
+                        continue
+                except RuntimeError as exc:
+                    print(f"检查登录态失败，稍后重试：{exc}")
             failures += 1
             message = resp.get("msg") or resp.get("raw") or "未知错误"
             if failures == 1 or failures % 10 == 0:
@@ -262,6 +215,7 @@ def grab(s, args, motion_type, date_id):
 
         fields = resp["data"]
         conflict_count = 0
+        auth_refreshed = False
         if args.field:
             candidates = [f for f in fields if f["fieldName"] == args.field]
         else:
@@ -300,6 +254,14 @@ def grab(s, args, motion_type, date_id):
                     return
                 if r.get("code") == 0:
                     return field["fieldName"], PERIODS[idx]
+                try:
+                    auth_refreshed = ensure_authenticated(s)
+                except RuntimeError as exc:
+                    print(f"检查登录态失败：{exc}")
+                if auth_refreshed:
+                    date_id = None
+                    print("登录态已更新，重新查询场地后再提交。")
+                    break
                 if r.get("code") == 1002:
                     print(
                         "触发滑块验证码 (code 1002)，纯 HTTP 脚本暂无法自动处理，请改用浏览器手动提交。"
@@ -314,54 +276,14 @@ def grab(s, args, motion_type, date_id):
                 print("提交失败，错误不属于场地竞争，停止抢订。")
                 return
 
+            if auth_refreshed:
+                break
+
+        if auth_refreshed:
+            continue
+
         if conflict_count:
             print(f"本轮 {conflict_count} 个可用场地均竞争失败，重新查询...")
-
-
-def list_venues_main():
-    response = query_venues(make_session())
-    venues = response.get("rows") or []
-    if not venues:
-        print(
-            "获取场馆列表失败:",
-            response.get("msg") or response.get("msgContent") or response,
-        )
-        return
-
-    print("场馆:")
-    for venue in venues:
-        english_name = venue.get("venueNameEn") or ""
-        campus = venue.get("campusName") or venue.get("campusNameEn") or ""
-        print(
-            f"  - {venue['venueName']} ({english_name}) id={venue['venueId']} 校区={campus}"
-        )
-
-
-def list_sports_main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--venue", required=True, help="场馆名称")
-    args = parser.parse_args()
-
-    session = make_session()
-    venue = resolve_venue(session, args.venue)
-    if not venue:
-        print(f"未找到场馆「{args.venue}」，可用 list-venues 查看")
-        return
-
-    response = query_venue_types(session, venue["venueId"])
-    if response.get("code") != 0:
-        print("获取运动类型失败:", response.get("msg"))
-        return
-
-    venue_data = response.get("data") or {}
-    motion_types = venue_data.get("motionTypes") or []
-    print(f"运动类型（{venue['venueName']}）:")
-    for motion_type in motion_types:
-        tension = TENSION.get(int(motion_type.get("tension", 0)))
-        print(
-            f"  - {motion_type['name']} ({motion_type.get('nameEn', '')}) "
-            f"id={motion_type['id']} 紧张度={tension}"
-        )
 
 
 def main():
@@ -401,7 +323,7 @@ def main():
     resp = query_venue_types(s, args.venue)
     if resp.get("code") != 0:
         print(
-            "获取场馆信息失败，可能 cookie 已过期，请重新运行 save_login.py:",
+            "获取场馆信息失败:",
             resp.get("msg"),
         )
         return

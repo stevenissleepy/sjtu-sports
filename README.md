@@ -11,10 +11,11 @@ playwright install chromium
 
 ## 抢场地
 
-先登录一次保存 cookie（仅 cookie 过期时需要重跑）：
+复制 `.env.example` 为 `.env`，在其中设置 jAccount 账号和密码：
 
-```sh
-python -m sjtu_sports login
+```dotenv
+JACCOUNT_USERNAME="你的用户名"
+JACCOUNT_PASSWORD="你的密码"
 ```
 
 然后：

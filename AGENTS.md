@@ -20,9 +20,8 @@
 
 先激活 `.venv` 并运行 `python -m pip install -e .` 安装开发版本，再在仓库根目录执行：
 
-- `python -m sjtu_sports login`：打开浏览器并更新登录状态。
 - `python -m sjtu_sports list-venues`：列出全部场馆名称和 id。
 - `python -m sjtu_sports list-sports --venue 霍英东体育中心`：列出指定场馆的运动类型。
-- `python -m sjtu_sports reserve --help`：查看预约参数；实际预约默认每 0.3 秒查询一次，`--long-run` 每 0.8 秒查询一次。
+- `python -m sjtu_sports reserve --help`：查看预约参数；预约时自动检查并更新登录状态。实际预约默认每 0.8 秒查询一次，`--long-run` 每 60 秒查询一次。
 - `python -m sjtu_sports capture`：捕获 XHR 和 Fetch 请求。
 - `python -m sjtu_sports analyze`：分析 `output/captured.json`。
